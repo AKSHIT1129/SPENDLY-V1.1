@@ -8,39 +8,39 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = EmeraldPrimary,
+    primary = FintechAccent,
     onPrimary = Color.Black,
-    primaryContainer = Color(0xFF064E3B),
-    onPrimaryContainer = MintAccent,
-    secondary = IndigoAccent,
+    primaryContainer = Color(0xFF1F222C),
+    onPrimaryContainer = FintechAccent,
+    secondary = AmbientIndigoGlow,
     onSecondary = Color.White,
     background = RawSlateBg,
     onBackground = RawLightText,
     surface = RawSlateSurface,
     onSurface = RawLightText,
     surfaceVariant = RawSlateCard,
-    onSurfaceVariant = RawLightText,
+    onSurfaceVariant = RawGrayText,
     error = CoralRed,
     onError = Color.White,
     outline = RawSlateLine
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = EmeraldPrimary,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFD1FAE5),
-    onPrimaryContainer = Color(0xFF065F46),
-    secondary = IndigoAccent,
+private val LightColorScheme = darkColorScheme(
+    primary = FintechAccent,
+    onPrimary = Color.Black,
+    primaryContainer = Color(0xFF1F222C),
+    onPrimaryContainer = FintechAccent,
+    secondary = AmbientIndigoGlow,
     onSecondary = Color.White,
-    background = RawLightBg,
-    onBackground = RawDarkText,
-    surface = RawLightSurface,
-    onSurface = RawDarkText,
-    surfaceVariant = RawLightCard,
-    onSurfaceVariant = RawDarkGrayText,
+    background = RawSlateBg,
+    onBackground = RawLightText,
+    surface = RawSlateSurface,
+    onSurface = RawLightText,
+    surfaceVariant = RawSlateCard,
+    onSurfaceVariant = RawGrayText,
     error = CoralRed,
     onError = Color.White,
-    outline = RawLightBorder
+    outline = RawSlateLine
 )
 
 @Composable

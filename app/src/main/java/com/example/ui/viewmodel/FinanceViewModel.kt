@@ -12,6 +12,9 @@ import com.example.data.model.BillReminder
 import com.example.data.repository.FinanceRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 
 data class AppNotification(
@@ -73,8 +76,17 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         initialValue = "₹"
     )
 
-    val currencyRate = _currency.map { cur ->
-        when (cur) {
+    private val _exchangeRates = MutableStateFlow<Map<String, Double>>(
+        mapOf(
+            "USD" to 1.0 / 95.85,
+            "EUR" to 1.0 / 111.49,
+            "INR" to 1.0
+        )
+    )
+    val exchangeRates = _exchangeRates.asStateFlow()
+
+    val currencyRate = combine(_currency, _exchangeRates) { cur, rates ->
+        rates[cur] ?: when (cur) {
             "USD" -> 1.0 / 95.85
             "EUR" -> 1.0 / 111.49
             else -> 1.0
@@ -100,7 +112,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         val database = AppDatabase.getDatabase(application)
-        repository = FinanceRepository(database.financeDao())
+        repository = FinanceRepository(database.financeDao(), application)
 
         members = repository.allMembers.stateIn(
             scope = viewModelScope,
@@ -139,6 +151,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 seedDatabase()
             }
         }
+        fetchLiveExchangeRates()
     }
 
     private suspend fun seedDatabase() {
@@ -152,11 +165,12 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         repository.insertMember(m3)
 
         // Add pre-configured category budgets
-        repository.insertBudget(Budget(category = "Food", monthlyLimit = 15000.0, monthYear = "2026-05"))
-        repository.insertBudget(Budget(category = "Rent", monthlyLimit = 40000.0, monthYear = "2026-05"))
-        repository.insertBudget(Budget(category = "Shopping", monthlyLimit = 12000.0, monthYear = "2026-05"))
-        repository.insertBudget(Budget(category = "Entertainment", monthlyLimit = 6000.0, monthYear = "2026-05"))
-        repository.insertBudget(Budget(category = "Utilities", monthlyLimit = 8000.0, monthYear = "2026-05"))
+        val curMonth = getCurrentYearMonth()
+        repository.insertBudget(Budget(category = "Food", monthlyLimit = 15000.0, monthYear = curMonth))
+        repository.insertBudget(Budget(category = "Rent", monthlyLimit = 40000.0, monthYear = curMonth))
+        repository.insertBudget(Budget(category = "Shopping", monthlyLimit = 12000.0, monthYear = curMonth))
+        repository.insertBudget(Budget(category = "Entertainment", monthlyLimit = 6000.0, monthYear = curMonth))
+        repository.insertBudget(Budget(category = "Utilities", monthlyLimit = 8000.0, monthYear = curMonth))
 
         // Add Saving Goals
         repository.insertSavingGoal(SavingGoal(title = "Emergency Fund", targetAmount = 250000.0, currentAmount = 100000.0, targetDate = "Dec 2026"))
@@ -237,14 +251,21 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         val expenseVal = -amount
 
         viewModelScope.launch {
-            // Find active budget limits for that category
+            val currentMonth = getCurrentYearMonth()
+            // Find active budget limits for that category for the current month
             val budgetList = budgets.value
-            val targetBudget = budgetList.find { it.category.equals(category, ignoreCase = true) } ?: return@launch
+            val targetBudget = budgetList.find { 
+                it.category.equals(category, ignoreCase = true) && it.monthYear == currentMonth 
+            } ?: return@launch
 
-            // Compute current aggregate spent
+            // Compute current aggregate spent for the current month
             val allTx = transactions.value
             val currentSpent = allTx
-                .filter { it.category.equals(category, ignoreCase = true) && it.amount < 0 }
+                .filter { 
+                    it.category.equals(category, ignoreCase = true) && 
+                    it.amount < 0 && 
+                    isTimestampInMonth(it.date, currentMonth)
+                }
                 .sumOf { -it.amount }
 
             val projectedSpent = currentSpent + expenseVal
@@ -272,7 +293,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun addBudget(category: String, limit: Double) {
         viewModelScope.launch {
             val baseLimit = limit / currencyRate.value
-            repository.insertBudget(Budget(category = category, monthlyLimit = baseLimit, monthYear = "2026-05"))
+            repository.insertBudget(Budget(category = category, monthlyLimit = baseLimit, monthYear = getCurrentYearMonth()))
             showInAppNotification("📊 Created monthly budget limit of ${getCurrencySymbol()}${limit} for $category.")
         }
     }
@@ -369,5 +390,46 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun dismissNotification() {
         _notification.value = null
+    }
+
+    fun getCurrentYearMonth(): String {
+        val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+        return sdf.format(Date())
+    }
+
+    fun isTimestampInMonth(timestamp: Long, monthYear: String): Boolean {
+        val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+        return sdf.format(Date(timestamp)) == monthYear
+    }
+
+    private fun fetchLiveExchangeRates() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val moshi = com.squareup.moshi.Moshi.Builder()
+                    .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+                    .build()
+                val retrofit = retrofit2.Retrofit.Builder()
+                    .baseUrl("https://open.er-api.com/")
+                    .addConverterFactory(retrofit2.converter.moshi.MoshiConverterFactory.create(moshi))
+                    .build()
+                val api = retrofit.create(com.example.data.api.CurrencyApi::class.java)
+                val response = api.getLatestRates()
+                if (response.result == "success" && response.rates.isNotEmpty()) {
+                    val usd = response.rates["USD"]
+                    val eur = response.rates["EUR"]
+                    val inr = response.rates["INR"] ?: 1.0
+                    if (usd != null && eur != null) {
+                        _exchangeRates.value = mapOf(
+                            "USD" to usd,
+                            "EUR" to eur,
+                            "INR" to inr
+                        )
+                        android.util.Log.d("FinanceViewModel", "Live rates fetched: USD $usd, EUR $eur")
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FinanceViewModel", "Failed to fetch live exchange rates, falling back to static config", e)
+            }
+        }
     }
 }
