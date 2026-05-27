@@ -19,6 +19,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -85,7 +87,9 @@ fun SpendlyDashboard(
     val currencyRate by viewModel.currencyRate.collectAsStateWithLifecycle()
 
     // Screen display triggers
-    var showOnboarding by remember { mutableStateOf(false) } // Set to true to show Welcome page initially!
+    val onboardingFromViewModel by viewModel.showOnboarding.collectAsStateWithLifecycle()
+    var showOnboarding by remember(onboardingFromViewModel) { mutableStateOf(onboardingFromViewModel) }
+    var showProfileSetupDialog by remember { mutableStateOf(false) }
     var showExchangeScreen by remember { mutableStateOf(false) } // Screen 3
     var activeCategoryIndex by remember { mutableIntStateOf(0) } // Category Slider: 0: Recent Transactions, 1: Active Budgets, 2: Goals Vault, 3: Upcoming Bills
     var activeBottomDockTab by remember { mutableIntStateOf(0) } // Dock: 0: Home, 1: Transactions scroll, 2: Monthly chart analysis, 3: Profile list
@@ -209,7 +213,11 @@ fun SpendlyDashboard(
             label = "applet_onboarding"
         ) { onboardingActive ->
             if (onboardingActive) {
-                OnboardingScreen(onGetStarted = { showOnboarding = false })
+                OnboardingScreen(
+                    onGetStarted = {
+                        showProfileSetupDialog = true
+                    }
+                )
             } else if (showExchangeScreen) {
                 ExchangeScreen(
                     members = members,
@@ -448,6 +456,45 @@ fun SpendlyDashboard(
                                                          color = Color.White
                                                      )
                                                  }
+                                                 Spacer(modifier = Modifier.height(16.dp))
+                                                 HorizontalDivider(color = Color(0x19FFFFFF))
+                                                 Spacer(modifier = Modifier.height(16.dp))
+
+                                                 Row(
+                                                     modifier = Modifier.fillMaxWidth(),
+                                                     horizontalArrangement = Arrangement.SpaceBetween,
+                                                     verticalAlignment = Alignment.CenterVertically
+                                                 ) {
+                                                     Column(modifier = Modifier.weight(1f)) {
+                                                         Text(
+                                                             text = "Onboarding Walkthrough",
+                                                             fontSize = 14.sp,
+                                                             fontWeight = FontWeight.Medium,
+                                                             color = Color.White
+                                                         )
+                                                         Text(
+                                                             text = "Replay the classy walkthrough sequence",
+                                                             fontSize = 11.sp,
+                                                             color = Color.LightGray
+                                                         )
+                                                     }
+
+                                                     Button(
+                                                         onClick = { showOnboarding = true },
+                                                         colors = ButtonDefaults.buttonColors(
+                                                             containerColor = Color(0xFFDDF247),
+                                                             contentColor = Color.Black
+                                                         ),
+                                                         shape = RoundedCornerShape(8.dp),
+                                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                         modifier = Modifier.height(32.dp).testTag("replay_onboarding_trigger")
+                                                     ) {
+                                                         Text("Replay", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                     }
+                                                 }
+
+                                                 Spacer(modifier = Modifier.height(16.dp))
+                                                 HorizontalDivider(color = Color(0x19FFFFFF))
                                                  Spacer(modifier = Modifier.height(12.dp))
                                                  Row(
                                                      modifier = Modifier.fillMaxWidth(),
@@ -1572,6 +1619,23 @@ fun SpendlyDashboard(
         }
     }
 
+    if (showProfileSetupDialog) {
+        ProfileSetupDialog(
+            onDismiss = {
+                viewModel.completeOnboarding()
+                showProfileSetupDialog = false
+            },
+            onSave = { name, targetGoalTitle, targetGoalAmount ->
+                viewModel.setupPrimaryProfile(name, targetGoalTitle, targetGoalAmount)
+                showProfileSetupDialog = false
+            },
+            onSkip = {
+                viewModel.completeOnboarding()
+                showProfileSetupDialog = false
+            }
+        )
+    }
+
     if (showAddMemberDialog) {
         AddMemberDialog(
             onDismiss = { showAddMemberDialog = false },
@@ -1737,46 +1801,60 @@ fun DashboardCircleAction(
     }
 }
 
+@OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun OnboardingScreen(onGetStarted: () -> Unit) {
+fun OnboardingScreen(
+    onGetStarted: () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "ambient_glow_walkthrough")
+    val pulseGlow by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .drawBehind {
-                // Background Base: Deep pitch black `#09080E`
-                drawRect(color = Color(0xFF09080E))
+                drawRect(color = Color(0xFF09080E)) // Pitch black background #09080E
 
                 if (size.width > 0f) {
-                    // Top-Left Ambient Glow: Cosmic indigo/violet `#2C1E3D` with 55% opacity
+                    // Glowing sunset orange and deep violet ambient lights
                     drawCircle(
                         brush = Brush.radialGradient(
-                            colors = listOf(Color(0xFF2C1E3D).copy(alpha = 0.55f), Color.Transparent),
-                            center = androidx.compose.ui.geometry.Offset(0f, 0f),
-                            radius = size.width * 1.2f
+                            colors = listOf(Color(0xFFC06240).copy(alpha = 0.16f * pulseGlow), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.15f),
+                            radius = size.width * 1.3f
                         ),
-                        radius = size.width * 1.2f,
-                        center = androidx.compose.ui.geometry.Offset(0f, 0f)
+                        radius = size.width * 1.3f,
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.15f)
                     )
 
-                    // Top-Right Ambient Glow: Warm sunset orange / amber copper `#C06240` with 35% opacity
                     drawCircle(
                         brush = Brush.radialGradient(
-                            colors = listOf(Color(0xFFC06240).copy(alpha = 0.35f), Color.Transparent),
-                            center = androidx.compose.ui.geometry.Offset(size.width, 0f),
-                            radius = size.width * 1.2f
+                            colors = listOf(Color(0xFF8B5CF6).copy(alpha = 0.16f * (1.4f - pulseGlow)), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.85f),
+                            radius = size.width * 1.3f
                         ),
-                        radius = size.width * 1.2f,
-                        center = androidx.compose.ui.geometry.Offset(size.width, 0f)
+                        radius = size.width * 1.3f,
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.85f)
                     )
                 }
             }
             .safeDrawingPadding()
-            .padding(horizontal = 24.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // 3D floating graphic
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1786,71 +1864,332 @@ fun OnboardingScreen(onGetStarted: () -> Unit) {
                 FloatingGraphicCanvas()
             }
 
+            // Typography and Swipe Control
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1.1f)
-                    .padding(bottom = 32.dp),
+                    .padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "Unlock the\nFuture of\nFinance",
-                    fontSize = 44.sp,
+                    text = "Track. Budget.\nSave.\nTogether.",
+                    fontSize = 42.sp,
                     fontWeight = FontWeight.Black,
                     color = Color.White,
-                    lineHeight = 50.sp,
+                    lineHeight = 48.sp,
                     letterSpacing = (-1).sp
                 )
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "Gain full visibility of your transactions, budgets, bills, and user profiles beautifully.",
+                    text = "Keep track of daily transactions, active budgets, and savings targets in one beautiful space.",
                     fontSize = 15.sp,
                     color = Color(0xFFA1A1AA),
                     lineHeight = 22.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Normal
                 )
                 Spacer(modifier = Modifier.height(36.dp))
 
-                Box(
+                // Premium Swipe Slider Pill
+                val context = androidx.compose.ui.platform.LocalContext.current
+                var dragAmount by remember { mutableStateOf(0f) }
+                var isDragging by remember { mutableStateOf(false) }
+
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(64.dp)
                         .clip(RoundedCornerShape(32.dp))
-                        .background(Color(0x3D1F222C)) // Glassmorphic card fill
-                        .border(1.dp, Color(0x19FFFFFF), RoundedCornerShape(32.dp)) // Subtle white stroke
-                        .clickable(onClick = onGetStarted)
-                        .padding(horizontal = 6.dp),
-                    contentAlignment = Alignment.CenterStart
+                        .background(Color(0xE6121118)) // dark tray
+                        .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(32.dp))
+                        .padding(6.dp)
+                        .testTag("onboarding_swipe_pill")
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = null,
-                                tint = Color.Black,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                    val widthPx = with(androidx.compose.ui.platform.LocalDensity.current) { maxWidth.toPx() }
+                    val handleSizePx = with(androidx.compose.ui.platform.LocalDensity.current) { 52.dp.toPx() }
+                    val maxDragDistance = widthPx - handleSizePx - with(androidx.compose.ui.platform.LocalDensity.current) { 12.dp.toPx() }
 
+                    // Slide/spring animation when released
+                    val animatedDragDistance by animateFloatAsState(
+                        targetValue = if (isDragging) dragAmount else 0f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                        label = "drag_snapping"
+                    )
+
+                    // Text inside the slider tract
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val alpha = (1f - (animatedDragDistance / maxDragDistance)).coerceIn(0.15f, 1f)
                         Text(
-                            text = "Get Started",
-                            color = Color.White,
-                            fontSize = 16.sp,
+                            text = "Swipe to manage expenses",
+                            color = Color.White.copy(alpha = alpha),
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(end = 36.dp)
+                            letterSpacing = 1.sp
                         )
-                        Spacer(modifier = Modifier.width(32.dp))
                     }
+
+                    // Neon Lime Draggable Handle with Arrow
+                    val currentMaxDragDistance by rememberUpdatedState(maxDragDistance)
+                    val currentOnGetStarted by rememberUpdatedState(onGetStarted)
+
+                    Box(
+                        modifier = Modifier
+                            .offset(
+                                x = with(androidx.compose.ui.platform.LocalDensity.current) {
+                                    animatedDragDistance.toDp()
+                                }
+                            )
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE2F163)) // neon lime
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragStart = { isDragging = true },
+                                    onDragEnd = {
+                                        isDragging = false
+                                        val limit = currentMaxDragDistance
+                                        if (dragAmount >= limit * 0.95f) {
+                                            dragAmount = limit
+                                            
+                                            // Trigger tactile haptics/vibration
+                                            try {
+                                                val vibrator = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+                                                if (vibrator != null && vibrator.hasVibrator()) {
+                                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                                        vibrator.vibrate(
+                                                            android.os.VibrationEffect.createOneShot(
+                                                                80L,
+                                                                android.os.VibrationEffect.DEFAULT_AMPLITUDE
+                                                            )
+                                                        )
+                                                    } else {
+                                                        @Suppress("DEPRECATION")
+                                                        vibrator.vibrate(80L)
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                // Graces build environments or test suites safely
+                                            }
+
+                                            currentOnGetStarted()
+                                        } else {
+                                            dragAmount = 0f
+                                        }
+                                    },
+                                    onDragCancel = {
+                                        isDragging = false
+                                        dragAmount = 0f
+                                    },
+                                    onDrag = { change, dragAmountOffset ->
+                                        change.consume()
+                                        dragAmount = (dragAmount + dragAmountOffset.x).coerceIn(0f, currentMaxDragDistance)
+                                    }
+                                )
+                            }
+                            .testTag("swipe_handle"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Swipe Arrow",
+                            tint = Color.Black,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileSetupDialog(
+    onDismiss: () -> Unit,
+    onSave: (String, String?, Double?) -> Unit,
+    onSkip: () -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var goalTitle by remember { mutableStateOf("") }
+    var targetAmountStr by remember { mutableStateOf("") }
+    var showError by remember { mutableStateOf(false) }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .testTag("profile_setup_dialog_card"),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.OpaqueDialogBg),
+            border = BorderStroke(1.dp, Color(0x33FFFFFF))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Personalize Spendly",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Configure your profile to start tracking",
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Your Name input
+                Text(
+                    text = "YOUR NAME *",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (showError && name.isBlank()) Color.Red else Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.align(Alignment.Start),
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { 
+                        name = it
+                        if (it.isNotBlank()) showError = false
+                    },
+                    placeholder = { Text("e.g. Akshit", color = Color.Gray, fontSize = 14.sp) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFFDDF247),
+                        unfocusedBorderColor = if (showError && name.isBlank()) Color.Red else Color(0x2BFFFFFF),
+                        focusedContainerColor = Color(0x0CFFFFFF),
+                        unfocusedContainerColor = Color(0x05FFFFFF)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("setup_name_input")
+                )
+                if (showError && name.isBlank()) {
+                    Text(
+                        text = "Name cannot be empty",
+                        color = Color.Red,
+                        fontSize = 11.sp,
+                        modifier = Modifier.align(Alignment.Start).padding(top = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Savings Goal Title
+                Text(
+                    text = "SAVINGS GOAL TITLE (OPTIONAL)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.align(Alignment.Start),
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = goalTitle,
+                    onValueChange = { goalTitle = it },
+                    placeholder = { Text("e.g. Wedding Fund", color = Color.Gray, fontSize = 14.sp) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFFC06240),
+                        unfocusedBorderColor = Color(0x2BFFFFFF),
+                        focusedContainerColor = Color(0x0CFFFFFF),
+                        unfocusedContainerColor = Color(0x05FFFFFF)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("setup_goal_title_input")
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Target Saving Amount
+                Text(
+                    text = "TARGET SAVING AMOUNT (OPTIONAL)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.align(Alignment.Start),
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = targetAmountStr,
+                    onValueChange = { targetAmountStr = it },
+                    placeholder = { Text("e.g. 100000", color = Color.Gray, fontSize = 14.sp) },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF6366F1),
+                        unfocusedBorderColor = Color(0x2BFFFFFF),
+                        focusedContainerColor = Color(0x0CFFFFFF),
+                        unfocusedContainerColor = Color(0x05FFFFFF)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("setup_goal_amount_input")
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Buttons
+                Button(
+                    onClick = {
+                        if (name.isBlank()) {
+                            showError = true
+                        } else {
+                            val targetAmt = targetAmountStr.toDoubleOrNull()
+                            onSave(name.trim(), goalTitle.trim().takeIf { it.isNotEmpty() }, targetAmt)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFDDF247),
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .testTag("setup_create_profile_btn")
+                ) {
+                    Text(
+                        text = "Create Profile",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TextButton(
+                    onClick = onSkip,
+                    modifier = Modifier.testTag("setup_skip_btn")
+                ) {
+                    Text(
+                        text = "Skip Setup",
+                        color = Color(0xFFDDF247),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         }
