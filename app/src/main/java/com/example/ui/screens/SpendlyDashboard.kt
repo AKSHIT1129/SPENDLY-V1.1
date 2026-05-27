@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -61,7 +62,7 @@ private val BrandLime = androidx.compose.ui.graphics.Color(0xFFDDF247)
 private val TranslucentCardBg = androidx.compose.ui.graphics.Color(0x3D1F222C)
 private val TranslucentCardBorder = androidx.compose.ui.graphics.Color(0x19FFFFFF)
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SpendlyDashboard(
     viewModel: FinanceViewModel,
@@ -91,6 +92,7 @@ fun SpendlyDashboard(
 
     var showAddMemberDialog by remember { mutableStateOf(false) }
     var showAddTxDialog by remember { mutableStateOf(false) }
+    var showSendMoneyDialog by remember { mutableStateOf(false) }
     var txDialogTypeIsExpense by remember { mutableStateOf(true) }
     var showAddBudgetDialog by remember { mutableStateOf(false) }
     var showAddGoalDialog by remember { mutableStateOf(false) }
@@ -663,7 +665,6 @@ fun SpendlyDashboard(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .verticalScroll(rememberScrollState())
                                             .padding(top = 14.dp)
                                     ) {
                                         Row(
@@ -781,7 +782,274 @@ fun SpendlyDashboard(
                                             )
                                         }
 
-                                        Spacer(modifier = Modifier.height(18.dp))
+                                        if (isSearchActive && searchQuery.isNotEmpty()) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 22.dp, vertical = 12.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "Search Results",
+                                                    fontSize = 18.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White
+                                                )
+                                                TextButton(
+                                                    onClick = { searchQuery = "" }
+                                                ) {
+                                                    Text(
+                                                        text = "Clear",
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = BrandLime
+                                                    )
+                                                }
+                                            }
+
+                                            val hasNoMatches = filteredTransactions.isEmpty() &&
+                                                    filteredBudgets.isEmpty() &&
+                                                    filteredSavingGoals.isEmpty() &&
+                                                    filteredBillReminders.isEmpty()
+
+                                            if (hasNoMatches) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .padding(32.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Search,
+                                                            contentDescription = null,
+                                                            tint = Color.Gray,
+                                                            modifier = Modifier.size(48.dp)
+                                                         )
+                                                        Spacer(modifier = Modifier.height(16.dp))
+                                                        Text(
+                                                            text = "No matches found for \"$searchQuery\"",
+                                                            color = Color.LightGray,
+                                                            textAlign = TextAlign.Center,
+                                                            fontSize = 14.sp
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                LazyColumn(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .padding(horizontal = 20.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(11.dp),
+                                                    contentPadding = PaddingValues(bottom = 120.dp)
+                                                ) {
+                                                    if (filteredTransactions.isNotEmpty()) {
+                                                        item {
+                                                            Text(
+                                                                text = "Transactions (${filteredTransactions.size})",
+                                                                color = BrandLime,
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                modifier = Modifier.padding(vertical = 6.dp)
+                                                            )
+                                                        }
+                                                        items(filteredTransactions) { tx ->
+                                                            val isExpense = tx.amount < 0
+                                                            val author = members.find { it.id == tx.memberId }?.name ?: "Guest"
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .clip(RoundedCornerShape(20.dp))
+                                                                    .background(Color(0x14FFFFFF))
+                                                                    .border(1.dp, Color(0x19FFFFFF), RoundedCornerShape(20.dp))
+                                                                    .combinedClickable(
+                                                                        onClick = {},
+                                                                        onLongClick = { viewModel.deleteTransaction(tx) }
+                                                                    )
+                                                                    .padding(16.dp),
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                            ) {
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    Box(
+                                                                        modifier = Modifier
+                                                                            .size(42.dp)
+                                                                            .clip(CircleShape)
+                                                                            .background(if (isExpense) Color(0x2BFF5252) else Color(0x2B10B981)),
+                                                                        contentAlignment = Alignment.Center
+                                                                    ) {
+                                                                        Icon(
+                                                                            imageVector = getCategoryIcon(tx.category),
+                                                                            contentDescription = tx.category,
+                                                                            tint = if (isExpense) Color(0xFFF87171) else Color(0xFF10B981),
+                                                                            modifier = Modifier.size(18.dp)
+                                                                        )
+                                                                    }
+                                                                    Spacer(modifier = Modifier.width(14.dp))
+                                                                    Column(modifier = Modifier.widthIn(max = 160.dp)) {
+                                                                        Text(
+                                                                            text = tx.description.ifEmpty { tx.category },
+                                                                            color = Color.White,
+                                                                            fontSize = 14.sp,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            maxLines = 1,
+                                                                            overflow = TextOverflow.Ellipsis
+                                                                        )
+                                                                        Text(
+                                                                            text = "by $author • ${tx.category}",
+                                                                            color = Color(0xFFA1A1AA),
+                                                                            fontSize = 11.sp,
+                                                                            maxLines = 1,
+                                                                            overflow = TextOverflow.Ellipsis
+                                                                        )
+                                                                    }
+                                                                }
+                                                                Text(
+                                                                    text = if (isExpense) {
+                                                                        "-${currencySymbol}${String.format("%,.2f", -tx.amount)}"
+                                                                    } else {
+                                                                        "+${currencySymbol}${String.format("%,.2f", tx.amount)}"
+                                                                    },
+                                                                    color = if (isExpense) Color(0xFFF87171) else Color(0xFF34D399),
+                                                                    fontSize = 15.sp,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+
+                                                    if (filteredBudgets.isNotEmpty()) {
+                                                        item {
+                                                            Text(
+                                                                text = "Category Budgets (${filteredBudgets.size})",
+                                                                color = BrandLime,
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                modifier = Modifier.padding(vertical = 6.dp)
+                                                            )
+                                                        }
+                                                        items(filteredBudgets) { budget ->
+                                                            val spent = remember(convertedTransactions, budget) {
+                                                                val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                                                                convertedTransactions
+                                                                    .filter { 
+                                                                        it.category.equals(budget.category, ignoreCase = true) && 
+                                                                        it.amount < 0 && 
+                                                                        sdf.format(Date(it.date)) == budget.monthYear
+                                                                    }
+                                                                    .sumOf { -it.amount }
+                                                            }
+                                                            val ratio = if (budget.monthlyLimit > 0) (spent / budget.monthlyLimit).toFloat().coerceIn(0f, 1f) else 0f
+                                                            val color = if (ratio > 0.85f) Color(0xFFF87171) else BrandLime
+
+                                                            Card(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .combinedClickable(onClick = {}, onLongClick = { viewModel.deleteBudget(budget) }),
+                                                                shape = RoundedCornerShape(20.dp),
+                                                                colors = CardDefaults.cardColors(containerColor = TranslucentCardBg),
+                                                                border = BorderStroke(1.dp, TranslucentCardBorder)
+                                                            ) {
+                                                                Column(modifier = Modifier.padding(16.dp)) {
+                                                                    Row(
+                                                                        modifier = Modifier.fillMaxWidth(),
+                                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                    ) {
+                                                                        Text(budget.category, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                                                        Text("${currencySymbol}${String.format("%.0f", spent)} / ${currencySymbol}${String.format("%.0f", budget.monthlyLimit)}", color = Color.White, fontSize = 12.sp)
+                                                                    }
+                                                                    Spacer(modifier = Modifier.height(10.dp))
+                                                                    LinearProgressIndicator(
+                                                                        progress = ratio,
+                                                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+                                                                        color = color,
+                                                                        trackColor = Color(0x33FFFFFF)
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+
+                                                    if (filteredSavingGoals.isNotEmpty()) {
+                                                        item {
+                                                             Text(
+                                                                text = "Saving Goals (${filteredSavingGoals.size})",
+                                                                color = BrandLime,
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                modifier = Modifier.padding(vertical = 6.dp)
+                                                            )
+                                                        }
+                                                        items(filteredSavingGoals) { goal ->
+                                                            val ratio = if (goal.targetAmount > 0) (goal.currentAmount / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+                                                            Card(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .combinedClickable(
+                                                                        onClick = { showDepositGoalDialog = goal },
+                                                                        onLongClick = { viewModel.deleteSavingGoal(goal) }
+                                                                    ),
+                                                                shape = RoundedCornerShape(20.dp),
+                                                                colors = CardDefaults.cardColors(containerColor = TranslucentCardBg),
+                                                                border = BorderStroke(1.dp, TranslucentCardBorder)
+                                                            ) {
+                                                                Column(modifier = Modifier.padding(16.dp)) {
+                                                                    Row(
+                                                                        modifier = Modifier.fillMaxWidth(),
+                                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                    ) {
+                                                                        Column(modifier = Modifier.weight(1f)) {
+                                                                            Text(goal.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                                            Spacer(modifier = Modifier.height(2.dp))
+                                                                            Text("Target Date: ${goal.targetDate}", color = Color(0xFFA1A1AA), fontSize = 11.sp)
+                                                                        }
+                                                                        Text("${currencySymbol}${String.format("%.0f", goal.currentAmount)} / ${currencySymbol}${String.format("%.0f", goal.targetAmount)}", color = Color.White, fontSize = 12.sp)
+                                                                    }
+                                                                    Spacer(modifier = Modifier.height(10.dp))
+                                                                    LinearProgressIndicator(
+                                                                        progress = ratio,
+                                                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+                                                                        color = Color(0xFF10B981),
+                                                                        trackColor = Color(0x33FFFFFF)
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+
+                                                    if (filteredBillReminders.isNotEmpty()) {
+                                                        item {
+                                                            Text(
+                                                                text = "Upcoming Bills (${filteredBillReminders.size})",
+                                                                color = BrandLime,
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                modifier = Modifier.padding(vertical = 6.dp)
+                                                            )
+                                                        }
+                                                        items(filteredBillReminders) { bill ->
+                                                            BillReminderRow(
+                                                                bill = bill,
+                                                                today = today,
+                                                                currencySymbol = currencySymbol,
+                                                                onTogglePaid = { viewModel.toggleBillPaid(it) },
+                                                                onSimulateAlert = { viewModel.simulateBillNotification(it) },
+                                                                onDeleteBill = { viewModel.deleteBillReminder(it) }
+                                                            )
+                                                        }
+                                                     }
+                                                }
+                                            }
+                                        } else {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .verticalScroll(rememberScrollState())
+                                            ) {
+                                                Spacer(modifier = Modifier.height(18.dp))
 
                                         // Total funds across ALL profiles card as requested
                                         val totalSumAllProfiles = convertedTransactions.sumOf { it.amount }
@@ -865,8 +1133,7 @@ fun SpendlyDashboard(
                                             // Send Money Button
                                             Button(
                                                 onClick = {
-                                                    txDialogTypeIsExpense = true
-                                                    showAddTxDialog = true
+                                                    showSendMoneyDialog = true
                                                 },
                                                 modifier = Modifier
                                                     .weight(1f)
@@ -1173,6 +1440,8 @@ fun SpendlyDashboard(
                                     }
                                 }
                             }
+                                }
+                            }
                         }
                     }
                 }
@@ -1346,6 +1615,25 @@ fun SpendlyDashboard(
             },
             currencySymbol = currencySymbol,
             initialIsExpense = txDialogTypeIsExpense
+        )
+    }
+
+    if (showSendMoneyDialog) {
+        SendMoneyDialog(
+            members = members,
+            onDismiss = { showSendMoneyDialog = false },
+            onSend = { amount, memberId ->
+                val recipientName = members.find { it.id == memberId }?.name ?: "Member"
+                viewModel.addTransaction(
+                    amount = -amount,
+                    category = "Transfer",
+                    description = "Sent money to $recipientName",
+                    memberId = memberId,
+                    isShared = false
+                )
+                showSendMoneyDialog = false
+            },
+            currencySymbol = currencySymbol
         )
     }
 
