@@ -39,6 +39,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 import java.util.*
 import androidx.compose.ui.unit.dp
@@ -1817,6 +1823,24 @@ fun OnboardingScreen(
         label = "pulse"
     )
 
+    // UNIFIED SMOOTH ENTRY ANIMATIONS
+    val titleAlpha = remember { Animatable(0f) }
+    val titleOffset = remember { Animatable(35f) }
+    val descAlpha = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        val springSpec = spring<Float>(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        )
+        // High-performance quick reveal block
+        launch { titleAlpha.animateTo(1f, tween(600, easing = EaseOutCubic)) }
+        launch { titleOffset.animateTo(0f, springSpec) }
+        
+        delay(250)
+        descAlpha.animateTo(1f, tween(800, easing = EaseInOutSine))
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1854,7 +1878,41 @@ fun OnboardingScreen(
                 .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // 3D floating graphic
+            // Next-Gen status header chip
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    modifier = Modifier
+                        .graphicsLayer(
+                            alpha = titleAlpha.value,
+                            translationY = titleOffset.value
+                        )
+                        .background(Color(0xFF14131A), RoundedCornerShape(20.dp))
+                        .border(1.dp, Color(0x13FFFFFF), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(Color(0xFFE2F163), CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "SPENDLY QUANTUM ACCELERATOR ACTIVE",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.85f),
+                        letterSpacing = 1.3.sp
+                    )
+                }
+            }
+
+            // 3D floating graphic (featuring premium translucent live card + concentric rotating rings)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1872,68 +1930,122 @@ fun OnboardingScreen(
                     .padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = "Track. Budget.\nSave.\nTogether.",
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White,
-                    lineHeight = 48.sp,
-                    letterSpacing = (-1).sp
-                )
-                Spacer(modifier = Modifier.height(14.dp))
+                // High-End Typography with Neon Accent Layout & NO FULL STOPS
+                Column(
+                    modifier = Modifier.graphicsLayer(
+                        alpha = titleAlpha.value,
+                        translationY = titleOffset.value
+                    )
+                ) {
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(style = SpanStyle(color = Color.White)) {
+                                append("Track   Budget\nSave   ")
+                            }
+                            withStyle(style = SpanStyle(color = Color(0xFFE2F163))) {
+                                append("Together")
+                            }
+                        },
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        lineHeight = 46.sp,
+                        letterSpacing = (-1).sp
+                    )
+                }
+
                 Text(
                     text = "Keep track of daily transactions, active budgets, and savings targets in one beautiful space.",
                     fontSize = 15.sp,
                     color = Color(0xFFA1A1AA),
                     lineHeight = 22.sp,
-                    fontWeight = FontWeight.Normal
+                    fontWeight = FontWeight.Normal,
+                    modifier = Modifier
+                        .graphicsLayer(alpha = descAlpha.value)
+                        .padding(top = 14.dp)
                 )
-                Spacer(modifier = Modifier.height(36.dp))
 
-                // Premium Swipe Slider Pill
+                Spacer(modifier = Modifier.height(34.dp))
+
+                // Premium Swipe Slider Pill with Micro-Animations
                 val context = androidx.compose.ui.platform.LocalContext.current
                 var dragAmount by remember { mutableStateOf(0f) }
                 var isDragging by remember { mutableStateOf(false) }
 
+                // Text continuous shimmer
+                val shimmerAlpha by infiniteTransition.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 0.8f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1250, easing = EaseInOutSine),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "text_shimmer"
+                )
+
+                // Drag spring spec to have zero drag-lag but gorgeous release snap-back bounce
+                val dragSpringSpec: AnimationSpec<Float> = if (isDragging) {
+                    snap<Float>()
+                } else {
+                    spring<Float>(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                }
+
                 BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(64.dp)
-                        .clip(RoundedCornerShape(32.dp))
+                        .height(72.dp) // Height slightly increased to accommodate expanding handle beautifully
+                        .clip(RoundedCornerShape(36.dp))
                         .background(Color(0xE6121118)) // dark tray
-                        .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(32.dp))
-                        .padding(6.dp)
+                        .border(1.dp, Color(0x13FFFFFF), RoundedCornerShape(36.dp))
+                        .padding(5.dp)
                         .testTag("onboarding_swipe_pill")
                 ) {
                     val widthPx = with(androidx.compose.ui.platform.LocalDensity.current) { maxWidth.toPx() }
-                    val handleSizePx = with(androidx.compose.ui.platform.LocalDensity.current) { 52.dp.toPx() }
-                    val maxDragDistance = widthPx - handleSizePx - with(androidx.compose.ui.platform.LocalDensity.current) { 12.dp.toPx() }
+                    // Base size of 56.dp in calculations avoids jitter from handle size changes
+                    val handleSizePx = with(androidx.compose.ui.platform.LocalDensity.current) { 56.dp.toPx() }
+                    val maxDragDistance = (widthPx - handleSizePx - with(androidx.compose.ui.platform.LocalDensity.current) { 10.dp.toPx() }).coerceAtLeast(1.0f)
 
-                    // Slide/spring animation when released
+                    // Snaps or springs the drag distance
                     val animatedDragDistance by animateFloatAsState(
                         targetValue = if (isDragging) dragAmount else 0f,
-                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                        animationSpec = dragSpringSpec,
                         label = "drag_snapping"
                     )
 
-                    // Text inside the slider tract
+                    val rawProgress = animatedDragDistance / maxDragDistance
+                    val progress = if (rawProgress.isNaN()) 0f else rawProgress.coerceIn(0f, 1f)
+
+                    // Text inside the slider tract (fades out as handle slides closer)
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        val alpha = (1f - (animatedDragDistance / maxDragDistance)).coerceIn(0.15f, 1f)
+                        val fadeAlpha = (1f - progress).coerceIn(0.0f, 1f)
                         Text(
                             text = "Swipe to manage expenses",
-                            color = Color.White.copy(alpha = alpha),
+                            color = Color.White.copy(alpha = shimmerAlpha * fadeAlpha),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
                         )
                     }
 
-                    // Neon Lime Draggable Handle with Arrow
+                    // Neon Lime Draggable Handle with dynamic scale sizes (56.dp to 62.dp)
                     val currentMaxDragDistance by rememberUpdatedState(maxDragDistance)
                     val currentOnGetStarted by rememberUpdatedState(onGetStarted)
+
+                    val handleSize by animateDpAsState(
+                        targetValue = if (isDragging) 62.dp else 56.dp,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                        label = "handle_size"
+                    )
+
+                    val rawAlpha = 0.25f + progress * 0.75f
+                    val glowAlpha = if (rawAlpha.isNaN()) 0.25f else rawAlpha.coerceIn(0f, 1f)
+                    val glowColor = Color(0xFFE2F163).copy(alpha = glowAlpha)
 
                     Box(
                         modifier = Modifier
@@ -1942,9 +2054,11 @@ fun OnboardingScreen(
                                     animatedDragDistance.toDp()
                                 }
                             )
-                            .size(52.dp)
+                            .size(handleSize)
+                            .align(Alignment.CenterStart)
                             .clip(CircleShape)
                             .background(Color(0xFFE2F163)) // neon lime
+                            .border(width = 2.dp, color = glowColor, shape = CircleShape)
                             .pointerInput(Unit) {
                                 detectDragGestures(
                                     onDragStart = { isDragging = true },
