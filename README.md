@@ -1,7 +1,7 @@
-# 📱 Spendly - Premium Individual & Shared Finance Manager
+# 📱 Spendly - Native Android Finance Manager
 
 <div align="center">
-  <img width="100%" height="auto" alt="Spendly Banner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" style="border-radius: 12px;" />
+  <img width="100%" height="auto" alt="Spendly Android Studio Banner" src="spendly_banner.png" style="border-radius: 12px;" />
 </div>
 
 ---
