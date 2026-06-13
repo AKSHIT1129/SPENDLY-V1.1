@@ -59,22 +59,21 @@ Spendly is a native Android application designed for personal and shared finance
    * Click **Sync Now** in the top-right notification bar to apply the changes.
 ---
 
-## Deploying the Application
+## Deploying the Application (Running on a Physical Android Device)
 
-### Running on a Physical Android Device
 1. Enable developer options on your Android device (Go to **Settings > About Phone** and tap **Build Number** 7 times).
 2. Open **Developer Options** in Settings and enable **USB Debugging**.
 3. Connect your device to the computer using a USB cable.
 4. Select your connected device from the device dropdown menu at the top of Android Studio.
 5. Click the green **Run** button (or press `Shift + F10`) to build and deploy the app.
 
-### Running on an Emulator
+## Running on an Emulator
 1. Open the **Device Manager** in Android Studio.
 2. Create and launch a virtual device (API Level 30+ recommended).
 3. Select the emulator in the device selection menu at the top.
 4. Click the green **Run** button to launch the application.
 
-### Compiling a Standalone APK
+## Compiling a Standalone APK
 1. In Android Studio, select **Build > Build Bundle(s) / APK(s) > Build APK(s)**.
 2. Locate the compiled file under:
    `[Project Directory]/app/build/outputs/apk/debug/app-debug.apk`
