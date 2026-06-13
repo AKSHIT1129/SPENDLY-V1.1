@@ -57,7 +57,6 @@ Spendly is a native Android application designed for personal and shared finance
      signingConfig = signingConfigs.getByName("debugConfig")
      ```
    * Click **Sync Now** in the top-right notification bar to apply the changes.
-
 ---
 
 ## Deploying the Application
